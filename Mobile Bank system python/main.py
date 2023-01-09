@@ -1,86 +1,126 @@
 
+import mysql.connector
+import pickle
 import random
+
+connection = mysql.connector.connect(host='localhost',
+                                     database='tshahriar',
+                                     user='****',
+                                     password='****')
+cursor = connection.cursor()
+
 class Customer:
-    accnumber = 554499
+
     def __init__(self, name, initialdeposit, passwd):
         self.name = name
-        self.balance = initialdeposit
+        self.balance = int(initialdeposit)
         self.passwd = passwd
-        self.accnumber = random.randint(1540,100000)
+        self.accnumber = random.randint(1540, 100000)
 
     def getname(self):
         return self.name
 
     def changename(self, newname):
         self.name = newname
+
     def getaccountno(self):
         return self.accnumber
 
     def setpasswd(self, newpasswd):
         self.passwd = newpasswd
+
     def getpasswd(self):
         return self.passwd
 
     def showBalance(self):
         return self.balance
 
-    def withdraw(self,amount):
-        self.balance -= amount
+    def withdraww(self, amount):
+        self.balance -= int(amount)
 
-    def add(self,amount):
-        self.balance += amount
+    def add(self, amount):
+        self.balance += int(amount)
 
     def printcust(self):
         print(f"Name: {self.name}\nAccount no: {self.accnumber}\nBalance: {self.balance}\n")
 
 
 class BankingSystem:
-    Customers = []
+
 
     def createAccount(self, name, deposit, passwd):
-        self.Customers.append(Customer(name, deposit, passwd))
-        return self.Customers[-1].printcust()
+        x = Customer(name, deposit, passwd)
+        pickledObject = pickle.dumps(x)
+        sql = "INSERT INTO Users VALUES (%s, %s, %s, %s, %s)"
+        val = (x.getaccountno(), x.getname(), x.getpasswd(), int(x.showBalance()), pickledObject)
+        cursor.execute(sql, val)
+        connection.commit()
+
+    def getObject(self, accno):
+        unpickle = ''
+        sqli = ("SELECT User_object FROM Users WHERE Account_no = %s")
+        cursor.execute(sqli, (accno,))
+        rows = cursor.fetchall()
+        for x in rows:
+            for y in x:
+                unpickle = (pickle.loads(y))
+                print(unpickle)
+        if (unpickle == ''):
+            return False
+        else:
+            return unpickle
+
+
+
     def login(self, accno, passwd):
-        for x in self.Customers:
-            if (x.getaccountno() == accno and x.getpasswd() == passwd ):
-                print(f"Welcome {x.getname}")
-                return 0
-            elif (x.getaccountno == accno and x.getpasswd != passwd):
-                print("Enter the password correctly")
-                return 1
-            elif (x.getaccountno != accno and x.getpasswd == passwd):
-                print("Enter the account no correctly")
-                return 1
+        code = 1
+        msg = ''
+        x = self.getObject(accno)
+        if (type(x) == Customer):
+            if (x.getpasswd() == passwd):
+                print(f"Welcome {x.getname()}")
+                code = 0
             else:
-                print("Enter password and account number correctly")
-                return 1
+                msg = "Input the password correctly"
+        else:
+            msg = "Input the account no correctly"
+
+        print(code)
 
 
-    def addBalance(self,AccountNo,amount):
-        for x in self.Customers:
-            if (x.getaccountno() == AccountNo):
-                x.add(amount)
+        return code,msg
+
+    def updatee(self, accno, userobj):
+        sql = "UPDATE Users SET User_object = %s WHERE Account_no = %s"
+        uobj = pickle.dumps(userobj)
+        val = (uobj, accno)
+        cursor.execute(sql, val)
+        connection.commit()
+
+    def addBalance(self, accountNo, amount):
+        x = self.getObject(accountNo)
+        x.add(amount)
+        self.updatee(accountNo, x)
+
     def checkBalance(self, accountno):
-        for x in self.Customers:
-            if (x.getaccountno() == accountno):
-                print(x.showBalance())
+        x = self.getObject(accountno)
+        print(f"Your Balance is {x.showBalance()}")
 
     def withdraw(self,AccountNo,amount):
-        for x in self.Customers:
-            if (x.getaccountno() == AccountNo):
-                x.withdraw(amount)
-    def sendMoney(self, saccno, raccno, amount):
-        for x in self.Customers:
-            x.withdraw(saccno,amount)
-        for y in self.Customers:
-            y.addBalance(raccno, amount)
+        x = self.getObject(AccountNo)
+        x.withdraww(amount)
+        self.updatee(AccountNo, x)
+        msg = "Success! The new balance is " + str(x.showBalance())
+        return msg
 
+    def sendMoney(self, saccno, raccno, amount):
+        self.addBalance(raccno,amount)
+        return self.withdraw(saccno, amount)
 
 
     def printcust(self):
         for cust in self.Customers:
             cust.printcust()
-
 
 
 class BankingSystemInterface:
@@ -104,39 +144,54 @@ class BankingSystemInterface:
             bank.createAccount(name, initialDeposit, passwdd)
         elif (inp == "2"):
             print("Account no: ", end="")
-            accno = input()
-            print("passwd: ", end=' ')
+            accno = int(input())
+            print("Password: ", end='')
             passwd = input()
             lg = bank.login(accno, passwd)
-            print(lg)
-            while (lg == 1):
+            while (lg[0] == 1):
+                print(lg[1])
                 print("Account no: ", end="")
-                accno = input()
-                print("passwd: ", end=' ')
+                accno = int(input())
+                print("passwd: ", end='')
                 passwd = input()
-                bank.login(accno, passwd)
+                lg = bank.login(accno, passwd)
             else:
-                print("Select from the following options: ")
-                print("1) Check Balance\n2) Withdraw Money\n3) Deposit Money\n 4) Transfer Money")
-                print("Enter 1 or 2")
-                print(">", end=' ')
-                inpp = input()
-                if (inpp == '1'):
-                    bank.checkBalance(accno)
-                elif (inpp == '2'):
-                    print("Enter the amount: ", end='')
-                    amount = input()
-                    bank.withdraw(accno, amount)
-                elif (inpp == '3'):
-                    print("Enter the amount: ", end='')
-                    amount = input()
-                    bank.addBalance(accno, amount)
-                elif (inpp == '4'):
-                    print("Enter the account no of the receiver", end='')
-                    accountn = input()
-                    print("Enter the amount", end ="")
-                    amount = input()
-                    bank.sendMoney(accno, accountn, amount)
+                    inpp = 0
+                    while (inpp != '5'):
+                        print("Select from the following options: ")
+                        print("1) Check Balance\n2) Withdraw Money\n3) Deposit Money\n4) Transfer Money\n5) Logout")
+                        print("Enter 1 or 2 or 3 or 4 or 5")
+                        print(">", end=' ')
+                        inpp = input()
+                        if (inpp == '1'):
+                            bank.checkBalance(accno)
+                        elif (inpp == '2'):
+                            print("Enter the amount: ", end='')
+                            amount = int(input())
+                            bank.withdraw(accno, amount)
+                        elif (inpp == '3'):
+                            print("Enter the amount: ", end='')
+                            amount = int(input())
+                            bank.addBalance(accno, amount)
+                        elif (inpp == '4'):
+                            print("Enter the account no of the receiver: ", end='')
+                            accountn = int(input())
+                            print("Enter the amount: ", end='')
+                            amount = int(input())
+                            print(bank.sendMoney(accno, accountn, amount))
+                        elif (inpp == '5'):
+                            break
+                        else:
+                            print("Input the option correctly")
+
+
+if connection.is_connected():
+    cursor.close()
+    connection.close()
+    print("MySQL connection is closed")
+
+
+
 
 
 
